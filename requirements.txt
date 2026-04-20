@@ -1,0 +1,7 @@
+httpx
+pdfplumber
+openpyxl
+tqdm
+aiofiles
+openai
+pandas

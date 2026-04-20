@@ -1,0 +1,50 @@
+# ── 敏感配置（含API Key，绝对不能上传）──
+config.py
+
+# ── 数据库（体积巨大，含原始文本）──
+*.db
+*.sqlite
+*.sqlite3
+
+# ── 输入/输出数据文件 ──
+*.xlsx
+*.xls
+*.csv
+
+# ── 运行日志 ──
+*.log
+run_*.log
+
+# ── PDF报告（生成物，不需要版本管理）──
+*.pdf
+
+# ── Python缓存 ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── 虚拟环境 ──
+venv/
+.venv/
+env/
+ENV/
+
+# ── macOS系统文件 ──
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── IDE配置 ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Claude Code内部文件 ──
+.claude/
