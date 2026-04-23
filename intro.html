@@ -605,36 +605,42 @@
 
   <!-- ─── 6. Granularity ─── -->
   <section id="granularity">
-    <div class="section-title">细粒度评分（信息密度）</div>
+    <div class="section-title">细粒度评分（Information Granularity）</div>
     <div class="card">
-      <p style="margin-bottom:1rem;color:#555"><strong>定义：</strong>LLM 在阅读文本时直接估算，输出 0–100 整数，表示全文中「对股价判断有直接参考价值的内容」占全文字数的比例。</p>
+      <p style="margin-bottom:1rem;color:#555"><strong>定义：</strong>衡量公告文本信息的<strong>具体程度与精确程度</strong>，而非信息在全文中的占比。核心问题是：这段信息能不能让投资者直接定价？</p>
 
-      <pre>granularity = 有效信息字数 ÷ 全文字数 × 100</pre>
-
-      <p style="font-size:.85rem;color:#555;margin:.8rem 0">「有效信息」= 关键财务数据、金额、比率、事件结论；背景介绍、法律条文引用、模板声明 = 低价值。</p>
-
-      <div class="gran-bar">
-        <div class="gran-seg" style="background:#F0F0F0;flex:.10">0–10%</div>
-        <div class="gran-seg" style="background:#FFF3CD;flex:.20">11–30%</div>
-        <div class="gran-seg" style="background:#D6EAF8;flex:.30">31–60%</div>
-        <div class="gran-seg" style="background:#D5F5E3;flex:.20">61–80%</div>
-        <div class="gran-seg" style="background:#00B050;color:#fff;flex:.20">81–100%</div>
-      </div>
-
-      <table class="gran-table">
-        <tr><th>颜色</th><th>区间</th><th>密度等级</th><th>典型公告</th></tr>
-        <tr><td style="background:#F0F0F0">⬜ 浅灰</td><td>0–10%</td><td>极低</td><td>公司章程、股东大会通知</td></tr>
-        <tr><td style="background:#FFF3CD">🟡 浅黄</td><td>11–30%</td><td>低</td><td>年度报告全文、招股说明书</td></tr>
-        <tr><td style="background:#D6EAF8">🔵 浅蓝</td><td>31–60%</td><td>中等</td><td>半年报摘要、重大合同公告</td></tr>
-        <tr><td style="background:#D5F5E3">🟢 浅绿</td><td>61–80%</td><td>高</td><td>季报摘要、回购完成公告</td></tr>
-        <tr><td style="background:#00B050;color:#fff">🟢 深绿</td><td>81–100%</td><td>极高</td><td>季报业绩快报、重组完成简报</td></tr>
+      <div class="section-sub" style="margin-top:.5rem">核心直觉</div>
+      <table>
+        <tr><th>粒度层级</th><th>示例</th><th>信息量</th></tr>
+        <tr><td>极粗（0–20）</td><td>"公司业绩表现良好"</td><td>方向模糊，无法定价</td></tr>
+        <tr><td>粗（21–40）</td><td>"净利润同比增长，营收超预期"</td><td>有方向，无具体数字</td></tr>
+        <tr><td>中（41–60）</td><td>"Q3净利润同比增长约30%，受益于产品涨价"</td><td>有数字，因果残缺</td></tr>
+        <tr><td>细（61–80）</td><td>"Q3净利润12.3亿，同比+28%，因产品均价提升15%"</td><td>精确，可直接参考</td></tr>
+        <tr><td>极细（81–100）</td><td>"Q3净利润12.3亿，同比+28%，超一致预期4.2%；因28nm产能利用率升至92%，带动毛利率环比+3.2pct"</td><td>完整，可直接定价</td></tr>
       </table>
 
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:.8rem 1rem;margin-top:1rem;font-size:.85rem;color:#1e40af">
-        <strong>推荐筛选组合：</strong><code>is_valuable = 有</code> + <code>granularity ≥ 61</code>，快速定位价值高且信息集中的公告
+      <div class="section-sub">五个评分维度（累加逻辑）</div>
+      <table>
+        <tr><th>维度</th><th>高分条件</th><th>最高加分</th></tr>
+        <tr><td>① 数值具体性</td><td>含精确数字（金额/比率/百分比）</td><td>+20</td></tr>
+        <tr><td>② 时间精度</td><td>精确到季度或具体日期</td><td>+15</td></tr>
+        <tr><td>③ 主体明确性</td><td>细化到业务线/产品/具体事件</td><td>+10</td></tr>
+        <tr><td>④ 因果链完整性</td><td>有完整原因 + 传导路径 + 结论</td><td>+15</td></tr>
+        <tr><td>⑤ 可证伪性</td><td>结论可被后续数据核实或证伪</td><td>+10</td></tr>
+      </table>
+
+      <div class="gran-bar" style="margin-top:1.2rem">
+        <div class="gran-seg" style="background:#F0F0F0;flex:.20">0–20<br>极粗</div>
+        <div class="gran-seg" style="background:#FFF3CD;flex:.20">21–40<br>粗</div>
+        <div class="gran-seg" style="background:#D6EAF8;flex:.20">41–60<br>中</div>
+        <div class="gran-seg" style="background:#D5F5E3;flex:.20">61–80<br>细</div>
+        <div class="gran-seg" style="background:#00B050;color:#fff;flex:.20">81–100<br>极细</div>
       </div>
 
-      <p style="font-size:.83rem;color:#6b7280;margin-top:.8rem">注：long 类型文档（>10,000字）的 granularity 为基于节选片段的推断值，非精确统计。旧版本处理的记录 granularity 为 null，重新处理后自动填充。</p>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:.8rem 1rem;margin-top:1rem;font-size:.85rem;color:#1e40af">
+        <strong>推荐筛选组合：</strong><code>is_valuable = 有</code> + <code>granularity ≥ 61</code>，快速定位含具体数据的高价值公告<br>
+        <strong>注：</strong>无价值公告（is_valuable = 无）输出 <code>null</code>，不参与评分。
+      </div>
     </div>
   </section>
 

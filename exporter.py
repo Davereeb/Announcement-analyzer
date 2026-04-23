@@ -53,10 +53,10 @@ def export_to_excel():
     granularity_col_idx = COLUMNS.index("granularity") + 1
 
     def _granularity_fill(g):
-        """信息密度色阶：0-10灰→11-30浅黄→31-60浅蓝→61-80浅绿→81-100深绿"""
+        """信息细粒度色阶：0-20灰→21-40浅黄→41-60浅蓝→61-80浅绿→81-100深绿"""
         if g is None: return None
-        if g <= 10:  return PatternFill(fill_type="solid", fgColor="F0F0F0")
-        if g <= 30:  return PatternFill(fill_type="solid", fgColor="FFF3CD")
+        if g <= 20:  return PatternFill(fill_type="solid", fgColor="F0F0F0")
+        if g <= 40:  return PatternFill(fill_type="solid", fgColor="FFF3CD")
         if g <= 60:  return PatternFill(fill_type="solid", fgColor="D6EAF8")
         if g <= 80:  return PatternFill(fill_type="solid", fgColor="D5F5E3")
         return PatternFill(fill_type="solid", fgColor="00B050")
