@@ -26,6 +26,7 @@ def create_tables():
                 summary         TEXT,
                 reason          TEXT,
                 emotion         INTEGER,
+                granularity     INTEGER,
 
                 fetch_time      REAL,
                 llm_time        REAL,
@@ -99,6 +100,7 @@ def update_done(
     summary: str,
     reason: str,
     emotion,
+    granularity,
     llm_time: float,
     input_tokens: int,
     output_tokens: int,
@@ -108,12 +110,12 @@ def update_done(
         conn.execute(
             """UPDATE announcements
                SET status='done', is_valuable=?, summary=?, reason=?, emotion=?,
-                   llm_time=?, input_tokens=?, output_tokens=?,
+                   granularity=?, llm_time=?, input_tokens=?, output_tokens=?,
                    processed_at=?, error_msg=NULL
                WHERE id=?""",
             (
                 is_valuable, summary, reason, emotion,
-                llm_time, input_tokens, output_tokens,
+                granularity, llm_time, input_tokens, output_tokens,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 id,
             ),

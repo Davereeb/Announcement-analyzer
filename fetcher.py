@@ -229,9 +229,27 @@ def prepare_text(text: str, doc_type: str) -> str:
     if doc_type in ("short", "medium"):
         return text
 
-    # long: head + mid + tail
-    head = text[:2000]
-    mid_start = len(text) // 2 - 1000
-    mid = text[mid_start: mid_start + 2000]
-    tail = text[-2000:]
-    return f"{head}\n\n[...中间省略...]\n\n{mid}\n\n[...中间省略...]\n\n{tail}"
+    # long: body-aware 三段采样
+    # 中文年报/招股书前 8% 通常是封面/目录/免责声明，后 5% 是附录/签字页，均信息密度极低
+    n = len(text)
+    body_start = int(n * 0.08)   # 跳过前言/目录
+    body_end   = int(n * 0.93)   # 跳过附录/签字
+    body = text[body_start:body_end]
+    blen = len(body)
+
+    # 段1：正文前段（含关键披露/摘要，约8%-18%位置）
+    seg1 = body[:2000]
+    # 段2：正文核心（财务数据/核心条款集中区）
+    seg2_s = blen // 2 - 1000
+    seg2 = body[seg2_s: seg2_s + 2000]
+    # 段3：正文后段（结论/风险/前瞻，约正文80%处，避开附录）
+    seg3_s = int(blen * 0.80) - 1000
+    seg3 = body[seg3_s: seg3_s + 2000]
+
+    return (
+        f"[节选·前段正文（已跳过封面目录）]\n{seg1}\n\n"
+        f"[...省略...]\n\n"
+        f"[节选·中段正文]\n{seg2}\n\n"
+        f"[...省略...]\n\n"
+        f"[节选·后段正文（已跳过附录签字页）]\n{seg3}"
+    )

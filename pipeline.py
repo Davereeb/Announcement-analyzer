@@ -61,8 +61,14 @@ async def process_one(record: dict, semaphore: asyncio.Semaphore, counters: dict
             summary = result.get("summary")
             reason = result.get("reason", "")
             emotion = result.get("emotion")
+            # granularity: clamp to 0-100 integer, default None if missing/invalid
+            raw_g = result.get("granularity")
+            try:
+                granularity = max(0, min(100, int(raw_g))) if raw_g is not None else None
+            except (TypeError, ValueError):
+                granularity = None
 
-            db.update_done(rid, is_valuable, summary, reason, emotion, llm_time, in_tok, out_tok)
+            db.update_done(rid, is_valuable, summary, reason, emotion, granularity, llm_time, in_tok, out_tok)
 
             counters["done"] += 1
             counters["in_tok"] += in_tok
