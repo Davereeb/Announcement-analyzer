@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A股半导体公告情感分析系统</title>
+<script src="chart.min.js"></script>
+<style>
+  :root {
+    --blue:    #2563eb;
+    --blue-lt: #eff6ff;
+    --blue-dk: #1e40af;
+    --green:   #16a34a;
+    --red:     #dc2626;
+    --gray:    #64748b;
+    --border:  #e2e8f0;
+    --bg:      #f8fafc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: var(--bg); color: #1e293b; line-height: 1.7; }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 32px; height: 52px;
+  }
+  nav a {
+    text-decoration: none; font-size: 13px; color: var(--gray);
+    padding: 4px 10px; border-radius: 6px; transition: .2s;
+  }
+  nav a:hover { background: var(--blue-lt); color: var(--blue); }
+  nav .logo { font-weight: 700; color: var(--blue-dk); margin-right: 16px; font-size: 14px; }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%);
+    color: #fff; padding: 72px 32px 56px; text-align: center;
+  }
+  .hero h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: .5px; margin-bottom: 12px; }
+  .hero p  { font-size: 1.1rem; opacity: .85; max-width: 640px; margin: 0 auto 32px; }
+  .hero-tags { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .hero-tags span {
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+    border-radius: 999px; padding: 4px 14px; font-size: 13px;
+  }
+
+  /* ── SECTION ── */
+  section { max-width: 1000px; margin: 0 auto; padding: 56px 24px; }
+  .section-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.5rem; font-weight: 700; color: var(--blue-dk);
+    margin-bottom: 32px; padding-bottom: 12px;
+    border-bottom: 2px solid var(--blue);
+  }
+  .section-title .num {
+    background: var(--blue); color: #fff;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+  }
+
+  /* ── STATS ROW ── */
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 48px; }
+  .stat-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .stat-card .val { font-size: 2rem; font-weight: 800; color: var(--blue-dk); }
+  .stat-card .lab { font-size: 12px; color: var(--gray); margin-top: 4px; }
+  .stat-card.green .val { color: var(--green); }
+  .stat-card.red   .val { color: var(--red); }
+
+  /* ── FLOW ── */
+  .flow {
+    display: flex; align-items: flex-start; gap: 0; overflow-x: auto;
+    padding: 8px 0 24px;
+  }
+  .flow-step {
+    flex: 1; min-width: 120px; text-align: center;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: "→";
+    position: absolute; right: -14px; top: 28px;
+    font-size: 22px; color: var(--blue); font-weight: 700;
+  }
+  .flow-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: var(--blue-lt); border: 2px solid var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin: 0 auto 10px;
+  }
+  .flow-step h4 { font-size: 13px; font-weight: 700; color: var(--blue-dk); }
+  .flow-step p  { font-size: 11px; color: var(--gray); margin-top: 4px; }
+
+  /* ── MODULE GRID ── */
+  .modules { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+  .mod-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .mod-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--blue-lt); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; flex-shrink: 0;
+  }
+  .mod-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .mod-card p  { font-size: 12px; color: var(--gray); }
+  .tag {
+    display: inline-block; font-size: 11px; padding: 1px 8px;
+    border-radius: 4px; background: var(--blue-lt); color: var(--blue);
+    font-weight: 600; margin-left: 6px;
+  }
+
+  /* ── CHALLENGE TABLE ── */
+  .challenges { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .challenges th {
+    background: var(--blue-dk); color: #fff;
+    padding: 10px 14px; text-align: left; font-weight: 600;
+  }
+  .challenges th:first-child { border-radius: 8px 0 0 0; }
+  .challenges th:last-child  { border-radius: 0 8px 0 0; }
+  .challenges td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .challenges tr:nth-child(even) td { background: #f8fafc; }
+  .challenges tr:hover td { background: var(--blue-lt); }
+  .pill {
+    display: inline-block; font-size: 11px; padding: 2px 10px;
+    border-radius: 999px; font-weight: 600;
+  }
+  .pill.red    { background: #fee2e2; color: #b91c1c; }
+  .pill.yellow { background: #fef9c3; color: #92400e; }
+  .pill.green  { background: #dcfce7; color: #166534; }
+
+  /* ── CHARTS ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .chart-card h3 { font-size: 14px; font-weight: 700; color: var(--blue-dk); margin-bottom: 16px; }
+
+  /* ── EMOTION LEGEND ── */
+  .emo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .emo-table th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-size: 12px; color: var(--gray); }
+  .emo-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .emo-bar { height: 8px; border-radius: 4px; display: inline-block; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+  /* ── INSIGHT CARDS ── */
+  .insights { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 32px; }
+  .insight {
+    background: #fff; border-left: 4px solid var(--blue);
+    border-radius: 0 10px 10px 0; padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .insight.green { border-left-color: var(--green); }
+  .insight.red   { border-left-color: var(--red); }
+  .insight .ico  { font-size: 22px; margin-bottom: 8px; }
+  .insight h4    { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .insight p     { font-size: 12px; color: var(--gray); }
+
+  /* ── TOP STOCKS ── */
+  .stock-bars { display: flex; flex-direction: column; gap: 10px; }
+  .stock-row  { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .stock-name { width: 130px; flex-shrink: 0; font-weight: 600; color: #334155; }
+  .stock-bar-wrap { flex: 1; background: #f1f5f9; border-radius: 4px; height: 22px; overflow: hidden; }
+  .stock-bar-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #60a5fa);
+                    border-radius: 4px; display: flex; align-items: center;
+                    padding-left: 8px; font-size: 12px; color: #fff; font-weight: 600; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center; padding: 32px; font-size: 12px; color: var(--gray);
+    border-top: 1px solid var(--border); background: #fff;
+  }
+
+  /* ── PROMPT BOX ── */
+  .prompt-wrap { margin: 24px 0; }
+  .prompt-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1e293b; color: #94a3b8;
+    font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    padding: 5px 14px 5px 10px; border-radius: 8px 8px 0 0;
+    font-family: monospace;
+  }
+  .prompt-label .dot-row { display: flex; gap: 4px; }
+  .prompt-label .dot-row span { width:8px;height:8px;border-radius:50%; }
+  pre.prompt-code {
+    background: #0f172a; color: #e2e8f0;
+    font-size: 12.5px; line-height: 1.8; font-family: "Fira Code", "Consolas", monospace;
+    padding: 20px 24px; border-radius: 0 8px 8px 8px;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    margin: 0;
+  }
+  pre.prompt-code .hl-key   { color: #7dd3fc; font-weight: 700; }
+  pre.prompt-code .hl-val   { color: #86efac; }
+  pre.prompt-code .hl-str   { color: #fcd34d; }
+  pre.prompt-code .hl-cmt   { color: #64748b; font-style: italic; }
+  pre.prompt-code .hl-brace { color: #fb923c; }
+
+  .step-detail {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 28px 32px; margin-bottom: 24px;
+  }
+  .step-detail h3 {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 15px; font-weight: 700; color: var(--blue-dk); margin-bottom: 6px;
+  }
+  .step-detail .sub { font-size: 13px; color: var(--gray); margin-bottom: 16px; }
+  .step-num {
+    background: var(--blue); color: #fff;
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .format-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-top: 14px; }
+  .fmt-card {
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; text-align: center; font-size: 12px;
+  }
+  .fmt-card .fmt-icon { font-size: 22px; margin-bottom: 6px; }
+  .fmt-card .fmt-name { font-weight: 700; color: #334155; }
+  .fmt-card .fmt-lib  { color: var(--gray); margin-top: 3px; font-size: 11px; }
+  .level-row { display: flex; gap: 12px; margin-top: 14px; }
+  .level-card {
+    flex: 1; border-radius: 8px; padding: 14px 16px; font-size: 12px;
+  }
+  .level-card h4 { font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+  .output-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 14px; }
+  .out-card {
+    border-radius: 8px; padding: 14px; font-size: 12px; border: 1px solid;
+  }
+  .out-card .out-field { font-family: monospace; font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .out-card .out-type  { font-size: 11px; opacity: .7; margin-bottom: 6px; }
+  .out-card .out-desc  { color: #334155; }
+
+  @media (max-width: 700px) {
+    .stats-row   { grid-template-columns: repeat(2,1fr); }
+    .modules     { grid-template-columns: 1fr; }
+    .charts-row  { grid-template-columns: 1fr; }
+    .insights    { grid-template-columns: 1fr; }
+    .flow-step:not(:last-child)::after { display: none; }
+    .flow { flex-direction: column; align-items: center; gap: 12px; }
+    .hero h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="logo">📊 公告分析系统</span>
+  <a href="#workflow">工作流程</a>
+  <a href="#prompt">Prompt详解</a>
+  <a href="#criteria">打分标准</a>
+  <a href="#modules">系统模块</a>
+  <a href="#challenges">技术难点</a>
+  <a href="#results">结果分析</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>A股半导体公告情感分析系统</h1>
+  <p>自动批量处理上市公司公告，通过大语言模型完成价值判断、摘要生成与情感评分</p>
+  <div class="hero-tags">
+    <span>📅 数据区间：2023 – 2025年</span>
+    <span>🏭 行业：A股半导体板块</span>
+    <span>🤖 模型：DeepSeek / Qwen</span>
+    <span>⚡ 并发：20个协程</span>
+  </div>
+</div>
+
+<!-- ═══════════════ 总览数据 ═══════════════ -->
+<section id="overview">
+  <div class="section-title"><div class="num">0</div>项目总览</div>
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="val">17,402</div>
+      <div class="lab">公告总数</div>
+    </div>
+    <div class="stat-card green">
+      <div class="val">99.3%</div>
+      <div class="lab">成功处理率（17,284条）</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">50.7%</div>
+      <div class="lab">有价值公告占比</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">¥39</div>
+      <div class="lab">API总费用（约$5.5 USD）</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 工作流程 ═══════════════ -->
+<section id="workflow" style="background:#fff; max-width:100%; padding: 56px 0;">
+<div style="max-width:1000px; margin:0 auto; padding: 0 24px;">
+  <div class="section-title"><div class="num">1</div>完整工作流程详解</div>
+
+  <!-- 总览流程图 -->
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-icon">📋</div>
+      <h4>输入数据</h4>
+      <p>Excel文件<br>17,402行</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">🗄️</div>
+      <h4>导入数据库</h4>
+      <p>SQLite<br>去重/断点续跑</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">⬇️</div>
+      <h4>下载文档</h4>
+      <p>httpx 流式<br>绕过反爬虫</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">📄</div>
+      <h4>提取文本</h4>
+      <p>5种格式<br>自动识别</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">✂️</div>
+      <h4>文本分级</h4>
+      <p>short / medium<br>/ long 三档</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">🤖</div>
+      <h4>LLM分析</h4>
+      <p>Prompt 调用<br>JSON输出</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-icon">📊</div>
+      <h4>导出报告</h4>
+      <p>Excel<br>颜色格式化</p>
+    </div>
+  </div>
+
+  <p style="font-size:13px; color:var(--gray); margin:8px 0 40px; text-align:center;">
+    ↓ 以下逐步展开每个关键环节的实现细节
+  </p>
+
+  <!-- ── STEP 1: 数据库与断点续跑 ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">1</span> 数据导入与断点续跑机制</h3>
+    <p class="sub">每条公告在数据库中有一个状态字段，记录处理进度。重新运行时自动跳过已完成记录。</p>
+    <div style="background:#1e293b; border-radius:12px; padding:24px;">
+      <div style="color:#94a3b8; font-size:12px; margin-bottom:14px; font-weight:600;">📌 数据库状态机</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <span style="background:#334155; color:#e2e8f0; padding:6px 14px; border-radius:6px; font-size:13px; font-family:monospace;">pending</span>
+        <span style="color:#64748b;">──→</span>
+        <span style="background:#1e3a5f; color:#93c5fd; padding:6px 14px; border-radius:6px; font-size:13px; font-family:monospace;">fetched</span>
+        <span style="color:#64748b;">──→</span>
+        <span style="background:#14532d; color:#86efac; padding:6px 14px; border-radius:6px; font-size:13px; font-family:monospace;">done ✓</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="color:#64748b; font-size:12px;">任一步骤失败 ──→</span>
+        <span style="background:#450a0a; color:#fca5a5; padding:6px 14px; border-radius:6px; font-size:13px; font-family:monospace;">failed（retry_count &lt; 3 可重试）</span>
+        <span style="color:#64748b; font-size:12px; margin-left:8px;">不支持格式 ──→</span>
+        <span style="background:#1c1917; color:#a8a29e; padding:6px 14px; border-radius:6px; font-size:13px; font-family:monospace;">skipped</span>
+      </div>
+      <div style="color:#64748b; font-size:12px; margin-top:14px; border-top:1px solid #334155; padding-top:12px;">
+        💡 关键设计：公告链接设为 <code style="color:#fcd34d;">UNIQUE</code> 约束，导入用 <code style="color:#fcd34d;">INSERT OR IGNORE</code>，多次运行不会产生重复记录。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: 下载与文本提取 ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">2</span> 文档下载与多格式文本提取</h3>
+    <p class="sub">从东方财富CDN下载公告文件，自动识别文件格式，调用对应解析器提取纯文本。</p>
+
+    <div style="background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:14px 16px; margin-bottom:16px; font-size:13px;">
+      <strong>⚠️ 反爬虫处理：</strong>东方财富CDN会先返回一段 JavaScript 挑战代码（而非真实PDF），需要先用 Node.js 执行该脚本提取 Cookie，再携带 Cookie 重试请求，才能拿到真实文件。
+    </div>
+
+    <div style="font-size:13px; font-weight:600; color:#334155; margin-bottom:10px;">文件格式自动识别（按 magic bytes 判断）：</div>
+    <div class="format-grid">
+      <div class="fmt-card">
+        <div class="fmt-icon">📕</div>
+        <div class="fmt-name">PDF</div>
+        <div class="fmt-lib">开头：<code>%PDF</code></div>
+        <div class="fmt-lib" style="margin-top:4px;">pdfplumber</div>
+      </div>
+      <div class="fmt-card">
+        <div class="fmt-icon">📘</div>
+        <div class="fmt-name">Word (.docx)</div>
+        <div class="fmt-lib">开头：<code>PK</code>（ZIP）</div>
+        <div class="fmt-lib" style="margin-top:4px;">python-docx</div>
+      </div>
+      <div class="fmt-card">
+        <div class="fmt-icon">📗</div>
+        <div class="fmt-name">旧版Word (.doc)</div>
+        <div class="fmt-lib">开头：<code>D0CF11E0</code></div>
+        <div class="fmt-lib" style="margin-top:4px;">olefile</div>
+      </div>
+      <div class="fmt-card">
+        <div class="fmt-icon">🌐</div>
+        <div class="fmt-name">HTML页面</div>
+        <div class="fmt-lib">开头：<code>&lt;html</code>等</div>
+        <div class="fmt-lib" style="margin-top:4px;">html.parser</div>
+      </div>
+      <div class="fmt-card">
+        <div class="fmt-icon">📄</div>
+        <div class="fmt-name">纯文本</div>
+        <div class="fmt-lib">UTF-8 可解码</div>
+        <div class="fmt-lib" style="margin-top:4px;">直接 decode</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: 文本分级 ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">3</span> 文本长度分级处理</h3>
+    <p class="sub">根据文本字数分为三档，短文档全文送入LLM，长文档进行智能三段采样，控制Token消耗。</p>
+    <div class="level-row">
+      <div class="level-card" style="background:#eff6ff; border:1px solid #bfdbfe;">
+        <h4 style="color:#1e40af;">🟦 short（&lt; 3,000字）</h4>
+        <div style="font-size:12px; color:var(--gray);">全文直接送入LLM，不作任何裁剪。<br>典型：简短董事会决议、股权变动公告。</div>
+      </div>
+      <div class="level-card" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+        <h4 style="color:#166534;">🟩 medium（3,000 – 10,000字）</h4>
+        <div style="font-size:12px; color:var(--gray);">全文直接送入LLM，不作任何裁剪。<br>典型：季报、半年报摘要、重大合同公告。</div>
+      </div>
+      <div class="level-card" style="background:#fff7ed; border:1px solid #fed7aa;">
+        <h4 style="color:#9a3412;">🟧 long（&gt; 10,000字）</h4>
+        <div style="font-size:12px; color:var(--gray);">
+          智能三段采样，拼接送入LLM：<br>
+          <code style="font-size:11px;">头部 2,000字 + [...中间省略...] + 中段 2,000字 + [...中间省略...] + 尾部 2,000字</code><br>
+          典型：重组报告书、招股说明书、大型年报。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: System Prompt ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">4</span> LLM 调用：System Prompt（系统提示词）</h3>
+    <p class="sub">设定模型的角色和输出格式约束。保持极简，避免干扰模型对正文的判断。</p>
+    <div class="prompt-wrap">
+      <div class="prompt-label">
+        <div class="dot-row">
+          <span style="background:#ef4444;"></span>
+          <span style="background:#f59e0b;"></span>
+          <span style="background:#22c55e;"></span>
+        </div>
+        &nbsp;SYSTEM PROMPT
+      </div>
+      <pre class="prompt-code">你是A股金融公告分析专家，专注于半导体板块。
+请分析公告文本，严格按JSON格式输出，不要输出任何其他内容，不要加```json标记。</pre>
+    </div>
+    <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:14px 16px; font-size:13px; color:var(--gray);">
+      💡 <strong>设计思路：</strong>System Prompt 故意写得极简——只定义角色（A股半导体分析专家）和格式约束（纯JSON，不加代码块标记）。具体的分析任务、字段定义、判断标准全部放在 User Prompt 里，这样每次调用可以携带不同的公告内容，而系统角色保持不变。
+    </div>
+  </div>
+
+  <!-- ── STEP 5: User Prompt ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">5</span> LLM 调用：User Prompt（用户提示词）</h3>
+    <p class="sub">每条公告动态生成，包含标题、类型、正文，以及详细的分析指令和输出格式定义。</p>
+    <div class="prompt-wrap">
+      <div class="prompt-label">
+        <div class="dot-row">
+          <span style="background:#ef4444;"></span>
+          <span style="background:#f59e0b;"></span>
+          <span style="background:#22c55e;"></span>
+        </div>
+        &nbsp;USER PROMPT（模板）
+      </div>
+      <pre class="prompt-code"><span class="hl-key">公告标题：</span><span class="hl-str">{title}</span>          <span class="hl-cmt"># 例：江丰电子:关于2024年半年度报告的公告</span>
+<span class="hl-key">公告类型：</span><span class="hl-str">{ann_type}</span>       <span class="hl-cmt"># 例：业绩预告、股东减持、定增预案…</span>
+
+<span class="hl-key">公告正文：</span>
+<span class="hl-str">{text}</span>                          <span class="hl-cmt"># 提取后的纯文本（按文本分级处理）</span>
+
+---
+请完成以下分析，输出纯JSON：
+
+<span class="hl-brace">{</span>
+  <span class="hl-key">"is_valuable"</span>: <span class="hl-str">"有或无"</span>,         <span class="hl-cmt"># 是否包含影响股价的实质信息</span>
+                                    <span class="hl-cmt"># 实质信息包括：业绩变动、增减持、回购、中标、</span>
+                                    <span class="hl-cmt"># 重组并购、股权变更、分红、重大诉讼、处罚、</span>
+                                    <span class="hl-cmt"># 重大合同、产品获批等</span>
+  <span class="hl-key">"summary"</span>: <span class="hl-str">"..."</span>,               <span class="hl-cmt"># 有价值时：核心事件+关键数据+影响方向，50-100字</span>
+                                    <span class="hl-cmt"># 无价值时：填 null</span>
+  <span class="hl-key">"reason"</span>: <span class="hl-str">"..."</span>,                <span class="hl-cmt"># 一句话说明判断依据</span>
+  <span class="hl-key">"emotion"</span>: <span class="hl-val">1</span>                   <span class="hl-cmt"># 有价值时：整数 2/1/0/-1/-2</span>
+                                    <span class="hl-cmt"># 无价值时：填 null</span>
+<span class="hl-brace">}</span></pre>
+    </div>
+    <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:14px 16px; font-size:13px; color:var(--gray);">
+      💡 <strong>关键参数：</strong>temperature 设为 <code>0.1</code>（接近确定性输出），确保相似公告得到一致的评分结果，减少随机波动。
+    </div>
+  </div>
+
+  <!-- ── STEP 6: LLM 输出格式 ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">6</span> LLM 输出：JSON 结构与字段说明</h3>
+    <p class="sub">模型输出严格的 JSON，程序解析后写入数据库。包含容错机制：若模型输出非标准JSON，用正则提取 <code>{...}</code> 后重新解析。</p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">
+      <!-- 左：实际输出示例 -->
+      <div>
+        <div style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:8px;">📤 实际输出示例（有价值公告）</div>
+        <div class="prompt-wrap" style="margin:0;">
+          <div class="prompt-label">
+            <div class="dot-row">
+              <span style="background:#ef4444;"></span>
+              <span style="background:#f59e0b;"></span>
+              <span style="background:#22c55e;"></span>
+            </div>
+            &nbsp;LLM RESPONSE
+          </div>
+          <pre class="prompt-code"><span class="hl-brace">{</span>
+  <span class="hl-key">"is_valuable"</span>: <span class="hl-str">"有"</span>,
+  <span class="hl-key">"summary"</span>: <span class="hl-str">"长川科技2025年Q3净利润
+同比增长207.6%至4.38亿元，
+单季营收同比+60%，盈利能力
+显著提升，半导体测试设备需求
+持续高景气。"</span>,
+  <span class="hl-key">"reason"</span>: <span class="hl-str">"季报业绩大幅增长，
+直接反映公司经营状况改善"</span>,
+  <span class="hl-key">"emotion"</span>: <span class="hl-val">2</span>
+<span class="hl-brace">}</span></pre>
+        </div>
+      </div>
+      <!-- 右：无价值示例 -->
+      <div>
+        <div style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:8px;">📤 实际输出示例（无价值公告）</div>
+        <div class="prompt-wrap" style="margin:0;">
+          <div class="prompt-label">
+            <div class="dot-row">
+              <span style="background:#ef4444;"></span>
+              <span style="background:#f59e0b;"></span>
+              <span style="background:#22c55e;"></span>
+            </div>
+            &nbsp;LLM RESPONSE
+          </div>
+          <pre class="prompt-code"><span class="hl-brace">{</span>
+  <span class="hl-key">"is_valuable"</span>: <span class="hl-str">"无"</span>,
+  <span class="hl-key">"summary"</span>: <span class="hl-val">null</span>,
+  <span class="hl-key">"reason"</span>: <span class="hl-str">"独立董事任职资格确认，
+属于程序性披露，不含实质
+性影响股价的信息"</span>,
+  <span class="hl-key">"emotion"</span>: <span class="hl-val">null</span>
+<span class="hl-brace">}</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- 字段说明 -->
+    <div style="margin-top:20px;">
+      <div style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:10px;">📋 字段含义说明</div>
+      <div class="output-grid">
+        <div class="out-card" style="background:#eff6ff; border-color:#bfdbfe;">
+          <div class="out-field" style="color:#1e40af;">"is_valuable"</div>
+          <div class="out-type">string</div>
+          <div class="out-desc">"有" 或 "无"<br>是否含影响股价的实质信息</div>
+        </div>
+        <div class="out-card" style="background:#f0fdf4; border-color:#bbf7d0;">
+          <div class="out-field" style="color:#166534;">"summary"</div>
+          <div class="out-type">string | null</div>
+          <div class="out-desc">50-100字摘要：核心事件＋关键数据＋影响方向；无价值时为 null</div>
+        </div>
+        <div class="out-card" style="background:#fefce8; border-color:#fde68a;">
+          <div class="out-field" style="color:#854d0e;">"reason"</div>
+          <div class="out-type">string</div>
+          <div class="out-desc">一句话判断依据，便于人工快速核验结论是否合理</div>
+        </div>
+        <div class="out-card" style="background:#fff7ed; border-color:#fed7aa;">
+          <div class="out-field" style="color:#9a3412;">"emotion"</div>
+          <div class="out-type">int | null</div>
+          <div class="out-desc">+2 极正 / +1 正 / 0 中性<br>-1 负 / -2 极负<br>无价值时为 null</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 判断与打分标准 ── -->
+  <div class="step-detail" id="criteria" style="border:2px solid #2563eb;">
+    <h3 style="font-size:17px; margin-bottom:4px;">
+      <span class="step-num" style="width:30px;height:30px;font-size:14px;">📌</span>
+      核心判断标准：价值判断 &amp; 情感评分
+    </h3>
+    <p class="sub" style="margin-bottom:24px;">以下两套标准直接写入 Prompt，是 LLM 打分的依据，也是理解结果的关键。</p>
+
+    <!-- 价值判断 -->
+    <div style="margin-bottom:32px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="background:#1e40af; color:#fff; font-weight:800; font-size:13px; padding:5px 14px; border-radius:20px;">① 价值判断标准</div>
+        <div style="font-size:13px; color:var(--gray);">输出：<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">有</code> 或 <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">无</code></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+        <!-- 有价值 -->
+        <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:18px;">
+          <div style="font-weight:800; color:#166534; font-size:14px; margin-bottom:12px;">✅ 判为"有"价值</div>
+          <div style="font-size:12px; color:#166534; font-weight:700; margin-bottom:8px;">包含以下任意一类实质信息：</div>
+          <div style="display:flex; flex-wrap:wrap; gap:7px;">
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">📈 业绩变动</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">📉 增减持</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">🔄 股份回购</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">🏆 重大中标</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">🤝 重组/并购</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">🏢 股权变更</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">💰 分红/转增</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">⚖️ 重大诉讼</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">🚫 监管处罚</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">📝 重大合同</span>
+            <span style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;">✅ 产品获批</span>
+          </div>
+          <div style="margin-top:12px; font-size:12px; color:#166534; background:#dcfce7; border-radius:6px; padding:10px 12px;">
+            💡 判断核心：该信息是否会导致市场参与者<strong>重新评估</strong>公司价值或股价预期
+          </div>
+        </div>
+
+        <!-- 无价值 -->
+        <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:10px; padding:18px;">
+          <div style="font-weight:800; color:#475569; font-size:14px; margin-bottom:12px;">❌ 判为"无"价值</div>
+          <div style="font-size:12px; color:#475569; font-weight:700; margin-bottom:8px;">仅包含常规程序性内容，例如：</div>
+          <div style="display:flex; flex-direction:column; gap:7px; font-size:12px; color:#475569;">
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>独立董事任职资格确认、董事/监事换届选举
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>会计师事务所续聘、年报审计委托
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>股东大会召开通知、会议纪要（无实质决议）
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>日常资金管理授权、常规关联交易续签
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>证监会/交易所问询函的格式性回复（无新信息）
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:6px;">
+              <span style="color:#94a3b8; flex-shrink:0;">·</span>公司章程修订（技术性条款）
+            </div>
+          </div>
+          <div style="margin-top:12px; font-size:12px; color:#64748b; background:#f1f5f9; border-radius:6px; padding:10px 12px;">
+            💡 这类公告属于合规要求的例行披露，<strong>不含增量信息</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情感评分 -->
+    <div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="background:#9a3412; color:#fff; font-weight:800; font-size:13px; padding:5px 14px; border-radius:20px;">② 情感评分标准</div>
+        <div style="font-size:13px; color:var(--gray);">仅对"有价值"公告打分，输出整数 <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">-2 / -1 / 0 / +1 / +2</code></div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+
+        <!-- +2 -->
+        <div style="display:grid; grid-template-columns:110px 1fr 1fr; gap:0; border-radius:10px; overflow:hidden; border:1px solid #86efac;">
+          <div style="background:#16a34a; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; line-height:1;">+2</div>
+            <div style="font-size:11px; margin-top:4px; opacity:.85;">极度正面</div>
+          </div>
+          <div style="background:#f0fdf4; padding:14px 16px; border-right:1px solid #bbf7d0;">
+            <div style="font-size:12px; font-weight:700; color:#166534; margin-bottom:6px;">打分条件（满足其一）</div>
+            <div style="font-size:12px; color:#166534; line-height:1.9;">
+              · 重大重组/并购完成，战略意义显著<br>
+              · 净利润/营收同比大幅增长（>100%）<br>
+              · 重大产品获批或核心资质取得<br>
+              · 大额股份回购完成，回购比例 >3%
+            </div>
+          </div>
+          <div style="background:#f0fdf4; padding:14px 16px;">
+            <div style="font-size:12px; font-weight:700; color:#166534; margin-bottom:6px;">典型案例</div>
+            <div style="font-size:12px; color:#166534; line-height:1.9;">
+              长川科技Q3净利润+207.6%<br>
+              金海通净利润+832.58%<br>
+              至正股份完成半导体资产重组
+            </div>
+          </div>
+        </div>
+
+        <!-- +1 -->
+        <div style="display:grid; grid-template-columns:110px 1fr 1fr; gap:0; border-radius:10px; overflow:hidden; border:1px solid #bbf7d0;">
+          <div style="background:#4ade80; color:#14532d; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; line-height:1;">+1</div>
+            <div style="font-size:11px; margin-top:4px;">正面</div>
+          </div>
+          <div style="background:#f0fdf4; padding:14px 16px; border-right:1px solid #dcfce7;">
+            <div style="font-size:12px; font-weight:700; color:#166534; margin-bottom:6px;">打分条件</div>
+            <div style="font-size:12px; color:#166534; line-height:1.9;">
+              · 业绩同比增长，但幅度适中（10%-100%）<br>
+              · 重大中标/签署合同，金额明确<br>
+              · 定增/再融资方案获批，募资顺利<br>
+              · 回购进展公告，体现管理层信心
+            </div>
+          </div>
+          <div style="background:#f0fdf4; padding:14px 16px;">
+            <div style="font-size:12px; font-weight:700; color:#166534; margin-bottom:6px;">典型案例</div>
+            <div style="font-size:12px; color:#166534; line-height:1.9;">
+              季报业绩增长、重大订单中标<br>
+              股份回购完成公告<br>
+              定增方案获证监会批复
+            </div>
+          </div>
+        </div>
+
+        <!-- 0 -->
+        <div style="display:grid; grid-template-columns:110px 1fr 1fr; gap:0; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0;">
+          <div style="background:#e2e8f0; color:#334155; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; line-height:1;">0</div>
+            <div style="font-size:11px; margin-top:4px;">中性</div>
+          </div>
+          <div style="background:#f8fafc; padding:14px 16px; border-right:1px solid #e2e8f0;">
+            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">打分条件</div>
+            <div style="font-size:12px; color:#475569; line-height:1.9;">
+              · 信息有实质内容，但方向不明确<br>
+              · 资产出售/转让，但对整体影响有限<br>
+              · 对外投资/设立子公司，规模较小<br>
+              · 调研活动纪要，无明确业绩指引
+            </div>
+          </div>
+          <div style="background:#f8fafc; padding:14px 16px;">
+            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">典型案例</div>
+            <div style="font-size:12px; color:#475569; line-height:1.9;">
+              战略合作协议（金额未披露）<br>
+              机构投资者调研接待公告<br>
+              股权激励计划草案公示
+            </div>
+          </div>
+        </div>
+
+        <!-- -1 -->
+        <div style="display:grid; grid-template-columns:110px 1fr 1fr; gap:0; border-radius:10px; overflow:hidden; border:1px solid #fecaca;">
+          <div style="background:#f87171; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; line-height:1;">-1</div>
+            <div style="font-size:11px; margin-top:4px; opacity:.85;">负面</div>
+          </div>
+          <div style="background:#fff5f5; padding:14px 16px; border-right:1px solid #fecaca;">
+            <div style="font-size:12px; font-weight:700; color:#991b1b; margin-bottom:6px;">打分条件</div>
+            <div style="font-size:12px; color:#991b1b; line-height:1.9;">
+              · 业绩下滑，同比下降但未亏损<br>
+              · 募投项目进度延期，原因明确<br>
+              · 重要股东减持计划披露<br>
+              · 诉讼/仲裁立案，金额较小
+            </div>
+          </div>
+          <div style="background:#fff5f5; padding:14px 16px;">
+            <div style="font-size:12px; font-weight:700; color:#991b1b; margin-bottom:6px;">典型案例</div>
+            <div style="font-size:12px; color:#991b1b; line-height:1.9;">
+              季报净利润同比下降30%<br>
+              高管/大股东减持计划公告<br>
+              募集资金项目延期使用申请
+            </div>
+          </div>
+        </div>
+
+        <!-- -2 -->
+        <div style="display:grid; grid-template-columns:110px 1fr 1fr; gap:0; border-radius:10px; overflow:hidden; border:1px solid #fca5a5;">
+          <div style="background:#dc2626; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; line-height:1;">-2</div>
+            <div style="font-size:11px; margin-top:4px; opacity:.85;">极度负面</div>
+          </div>
+          <div style="background:#fff1f1; padding:14px 16px; border-right:1px solid #fecaca;">
+            <div style="font-size:12px; font-weight:700; color:#7f1d1d; margin-bottom:6px;">打分条件（满足其一）</div>
+            <div style="font-size:12px; color:#7f1d1d; line-height:1.9;">
+              · 营收&amp;净利润双降，且由盈转亏<br>
+              · 净利润同比暴跌（&gt;-80%）或巨额亏损<br>
+              · 重大违规/处罚，涉及核心业务<br>
+              · 重大诉讼败诉，赔偿金额巨大
+            </div>
+          </div>
+          <div style="background:#fff1f1; padding:14px 16px;">
+            <div style="font-size:12px; font-weight:700; color:#7f1d1d; margin-bottom:6px;">典型案例</div>
+            <div style="font-size:12px; color:#7f1d1d; line-height:1.9;">
+              欧莱新材前三季度亏损-306.5%<br>
+              联动科技扣非净利润-97.39%<br>
+              阿石创净利润-126.57%由盈转亏
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end score rows -->
+
+      <div style="margin-top:16px; background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:14px 16px; font-size:13px; color:#713f12;">
+        ⚠️ <strong>重要说明：</strong>情感评分基于<strong>公告内容本身</strong>，而非当日股价走势。同一事件对不同时间窗口的股价影响可能不同，该评分反映的是"信息质量与方向"，不构成投资建议。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 并发与重试 ── -->
+  <div class="step-detail">
+    <h3><span class="step-num">7</span> 并发控制与容错重试</h3>
+    <p class="sub">20个协程并行处理，任意单条失败不影响全局；网络错误按指数退避自动重试最多3次。</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div style="background:#1e293b; border-radius:10px; padding:18px;">
+        <div style="color:#94a3b8; font-size:11px; font-weight:700; margin-bottom:10px;">⚡ 并发架构</div>
+        <pre style="color:#e2e8f0; font-size:12px; font-family:monospace; line-height:1.8; margin:0;">asyncio.Semaphore(20)
+  ├─ coroutine_01: 下载→提取→LLM
+  ├─ coroutine_02: 下载→提取→LLM
+  ├─ ...
+  └─ coroutine_20: 下载→提取→LLM
+
+<span style="color:#64748b;"># 单条异常被 try/except 捕获
+# 只更新该条状态为 failed
+# 其余19个协程继续运行</span></pre>
+      </div>
+      <div style="background:#1e293b; border-radius:10px; padding:18px;">
+        <div style="color:#94a3b8; font-size:11px; font-weight:700; margin-bottom:10px;">🔁 指数退避重试</div>
+        <pre style="color:#e2e8f0; font-size:12px; font-family:monospace; line-height:1.8; margin:0;">attempt 0: 失败 → 等待 2s
+attempt 1: 失败 → 等待 4s
+attempt 2: 失败 → 等待 8s
+attempt 3: 彻底失败
+  → status = 'failed'
+  → error_msg 记录异常类型
+
+<span style="color:#64748b;"># retry_count &lt; 3 的 failed 记录
+# 下次运行自动重新尝试</span></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ═══════════════ 系统模块 ═══════════════ -->
+<section id="modules">
+  <div class="section-title"><div class="num">2</div>系统模块架构</div>
+  <div class="modules">
+    <div class="mod-card">
+      <div class="mod-icon">⚙️</div>
+      <div>
+        <h4>config.py <span class="tag">配置层</span></h4>
+        <p>统一管理所有配置：API Key、并发数（20）、超时时长、文本分类阈值。修改一处即可调整全局行为。</p>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="mod-icon">🗃️</div>
+      <div>
+        <h4>db.py <span class="tag">数据层</span></h4>
+        <p>SQLite操作封装。公告链接设为唯一约束，INSERT OR IGNORE 实现幂等导入。侧表存储原始文本，主表保持精简。</p>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="mod-icon">⬇️</div>
+      <div>
+        <h4>fetcher.py <span class="tag">下载层</span></h4>
+        <p>核心模块。流式下载超大PDF（120s超时）；Node.js解析JS反爬虫挑战；自动识别5种文件格式并分发到对应解析器。</p>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="mod-icon">🤖</div>
+      <div>
+        <h4>llm.py <span class="tag">AI层</span></h4>
+        <p>支持 DeepSeek / Qwen 切换。指数退避重试网络错误；正则兜底解析非标准JSON输出；长文档三段采样（头+中+尾）。</p>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="mod-icon">🔄</div>
+      <div>
+        <h4>pipeline.py <span class="tag">调度层</span></h4>
+        <p>asyncio.Semaphore 控制20并发；tqdm 实时进度条；每100条打印 Token 消耗与费用统计；单条异常不影响全局。</p>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="mod-icon">📊</div>
+      <div>
+        <h4>exporter.py <span class="tag">输出层</span></h4>
+        <p>openpyxl 生成格式化Excel：情感列条件颜色、摘要列自动换行、冻结首行、自动提取股票名称列。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 技术难点 ═══════════════ -->
+<section id="challenges" style="background:#fff; max-width:100%; padding: 56px 0;">
+<div style="max-width:1000px; margin:0 auto; padding: 0 24px;">
+  <div class="section-title"><div class="num">3</div>遇到的技术难点与解决方案</div>
+  <table class="challenges">
+    <thead>
+      <tr>
+        <th style="width:18%">难点</th>
+        <th style="width:30%">根因分析</th>
+        <th style="width:14%">严重程度</th>
+        <th>解决方案</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>🕵️ JS反爬虫拦截</strong></td>
+        <td>东方财富CDN对非浏览器请求返回JavaScript挑战页，Content-Type仍标注为PDF，导致首次运行17,400条全部失败</td>
+        <td><span class="pill red">严重</span></td>
+        <td>调用 Node.js 执行挑战脚本，提取 Cookie 后携带重试；引入 asyncio.Lock 防止多协程竞争刷新 Cookie</td>
+      </tr>
+      <tr>
+        <td><strong>📄 多格式文档</strong></td>
+        <td>5,080条为 .docx，25条为HTML，4条为旧版.doc，pdfplumber全部报错且异常信息为空</td>
+        <td><span class="pill red">严重</span></td>
+        <td>按 magic bytes 自动识别格式，分发到5个专用解析器（pdfplumber / python-docx / olefile / html.parser / UTF-8）</td>
+      </tr>
+      <tr>
+        <td><strong>💰 API余额不足</strong></td>
+        <td>DeepSeek账户在处理约7,000条时返回402错误，流水线中断</td>
+        <td><span class="pill yellow">中等</span></td>
+        <td>充值后直接重新运行，断点续跑机制保证无数据损失</td>
+      </tr>
+      <tr>
+        <td><strong>📦 超大PDF截断</strong></td>
+        <td>部分PDF达20-29MB，30秒超时不足以完成下载</td>
+        <td><span class="pill yellow">中等</span></td>
+        <td>改用 httpx 流式下载，读取超时从30秒提升至120秒</td>
+      </tr>
+      <tr>
+        <td><strong>⚡ 空错误记录</strong></td>
+        <td>Python 3.11+ 中 str(TimeoutError()) 返回空字符串，导致约3,661条 error_msg 为空，无法诊断</td>
+        <td><span class="pill yellow">中等</span></td>
+        <td>改用 f"{type(e).__name__}: {e}"；重置为 pending 重跑，全部成功</td>
+      </tr>
+      <tr>
+        <td><strong>🗜️ 不支持格式</strong></td>
+        <td>1条RAR压缩包、1条47MB超大PDF（流式下载仍被截断）</td>
+        <td><span class="pill green">轻微</span></td>
+        <td>标记为 skipped 状态，不计入失败，后续人工处理</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- ═══════════════ 结果分析 ═══════════════ -->
+<section id="results">
+  <div class="section-title"><div class="num">4</div>结果分析</div>
+
+  <!-- 图表区 -->
+  <div class="charts-row">
+    <!-- 饼图：有/无价值 -->
+    <div class="chart-card">
+      <h3>📌 公告价值分布（共17,284条）</h3>
+      <canvas id="pieChart" height="220"></canvas>
+    </div>
+    <!-- 柱状图：情感分布 -->
+    <div class="chart-card">
+      <h3>📊 有价值公告情感评分分布（共8,759条）</h3>
+      <canvas id="barChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- 情感评分详细表 -->
+  <div style="background:#fff; border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:32px;">
+    <h3 style="font-size:14px; font-weight:700; color:var(--blue-dk); margin-bottom:16px;">📋 情感评分详细说明</h3>
+    <table class="emo-table">
+      <thead>
+        <tr>
+          <th>评分</th><th>颜色</th><th>数量</th><th>占有价值公告</th><th>占比可视化</th><th>典型公告类型</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>+2 极度正面</strong></td>
+          <td><span class="dot" style="background:#00B050;"></span>深绿</td>
+          <td><strong>104</strong></td>
+          <td>1.19%</td>
+          <td><span class="emo-bar" style="width:6px; background:#00B050;"></span></td>
+          <td>重大重组完成、业绩大幅预增、核心产品获批</td>
+        </tr>
+        <tr>
+          <td><strong>+1 正面</strong></td>
+          <td><span class="dot" style="background:#92D050;"></span>浅绿</td>
+          <td><strong>4,219</strong></td>
+          <td>48.2%</td>
+          <td><span class="emo-bar" style="width:241px; background:#92D050;"></span></td>
+          <td>季报业绩增长、中标公告、股份回购完成</td>
+        </tr>
+        <tr>
+          <td><strong>0 中性</strong></td>
+          <td><span class="dot" style="background:#ccc;"></span>白色</td>
+          <td><strong>2,859</strong></td>
+          <td>32.6%</td>
+          <td><span class="emo-bar" style="width:163px; background:#d1d5db;"></span></td>
+          <td>常规信息披露、董事会决议、资金使用说明</td>
+        </tr>
+        <tr>
+          <td><strong>-1 负面</strong></td>
+          <td><span class="dot" style="background:#FFCCCC;"></span>浅红</td>
+          <td><strong>1,477</strong></td>
+          <td>16.9%</td>
+          <td><span class="emo-bar" style="width:84px; background:#f87171;"></span></td>
+          <td>业绩下滑、募投项目延期、诉讼风险提示</td>
+        </tr>
+        <tr>
+          <td><strong>-2 极度负面</strong></td>
+          <td><span class="dot" style="background:#FF0000;"></span>深红</td>
+          <td><strong>100</strong></td>
+          <td>1.14%</td>
+          <td><span class="emo-bar" style="width:6px; background:#dc2626;"></span></td>
+          <td>营收净利双降、由盈转亏、重大亏损披露</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 最活跃股票 -->
+  <div style="background:#fff; border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:32px;">
+    <h3 style="font-size:14px; font-weight:700; color:var(--blue-dk); margin-bottom:20px;">🏆 公告数量最多的股票 TOP 10</h3>
+    <div class="stock-bars">
+      <div class="stock-row"><span class="stock-name">003043</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:100%">690</div></div></div>
+      <div class="stock-row"><span class="stock-name">300666 江丰电子</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:92.8%">640</div></div></div>
+      <div class="stock-row"><span class="stock-name">603690 至纯科技</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:87.2%">602</div></div></div>
+      <div class="stock-row"><span class="stock-name">688401</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:78.3%">540</div></div></div>
+      <div class="stock-row"><span class="stock-name">688535</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:70.7%">488</div></div></div>
+      <div class="stock-row"><span class="stock-name">605358</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:69.3%">478</div></div></div>
+      <div class="stock-row"><span class="stock-name">301297</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:69.0%">476</div></div></div>
+      <div class="stock-row"><span class="stock-name">300604 长川科技</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:67.0%">462</div></div></div>
+      <div class="stock-row"><span class="stock-name">688126</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:66.4%">458</div></div></div>
+      <div class="stock-row"><span class="stock-name">002371</span><div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:63.2%">436</div></div></div>
+    </div>
+  </div>
+
+  <!-- 洞察卡片 -->
+  <div class="insights">
+    <div class="insight green">
+      <div class="ico">💡</div>
+      <h4>筛选效率显著</h4>
+      <p>约49%的公告被判定为无价值（常规披露），LLM自动筛选<strong>减少近一半人工阅读量</strong></p>
+    </div>
+    <div class="insight">
+      <div class="ico">📈</div>
+      <h4>正面信号偏多</h4>
+      <p>正面信号（+1/+2）合计4,323条，占49.4%；<strong>正负比约 2.7 : 1</strong>，板块整体偏乐观</p>
+    </div>
+    <div class="insight red">
+      <div class="ico">⚠️</div>
+      <h4>重点关注-2公告</h4>
+      <p>100条极度负面公告建议<strong>优先人工复核</strong>，多集中在三季报亏损和业绩大幅下滑</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 费用说明 ═══════════════ -->
+<section style="background:#fff; max-width:100%; padding:48px 0; border-top:1px solid var(--border);">
+<div style="max-width:1000px; margin:0 auto; padding:0 24px;">
+  <div class="section-title"><div class="num">5</div>Token消耗与费用</div>
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+    <div style="background:var(--blue-lt); border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:1.6rem; font-weight:800; color:var(--blue-dk);">36,311,218</div>
+      <div style="font-size:12px; color:var(--gray); margin-top:4px;">输入 Token（¥0.001 / 千token）</div>
+    </div>
+    <div style="background:#f0fdf4; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:1.6rem; font-weight:800; color:#166534;">1,420,096</div>
+      <div style="font-size:12px; color:var(--gray); margin-top:4px;">输出 Token（¥0.002 / 千token）</div>
+    </div>
+    <div style="background:#fff7ed; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:1.6rem; font-weight:800; color:#9a3412;">¥39.15</div>
+      <div class="lab" style="font-size:12px; color:var(--gray); margin-top:4px;">总费用（约 $5.5 USD）</div>
+    </div>
+  </div>
+  <p style="margin-top:16px; font-size:13px; color:var(--gray); text-align:center;">
+    平均每条公告处理成本约 <strong>¥0.0023</strong>（不到1分钱），相当于人工阅读成本的千分之一。
+  </p>
+</div>
+</section>
+
+<footer>
+  <p>A股半导体公告情感分析系统 · 数据区间 2023-2025 · 处理记录 17,284 / 17,402</p>
+  <p style="margin-top:4px;">技术栈：Python asyncio · httpx · pdfplumber · DeepSeek API · SQLite · openpyxl</p>
+</footer>
+
+<script>
+// 饼图
+new Chart(document.getElementById('pieChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['有价值公告', '无价值公告'],
+    datasets: [{
+      data: [8759, 8525],
+      backgroundColor: ['#2563eb', '#e2e8f0'],
+      borderWidth: 2, borderColor: '#fff'
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 12 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.label}：${ctx.raw.toLocaleString()}条 (${(ctx.raw/17284*100).toFixed(1)}%)`
+        }
+      }
+    },
+    cutout: '60%'
+  }
+});
+
+// 柱状图
+new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: {
+    labels: ['+2 极度正面', '+1 正面', '0 中性', '-1 负面', '-2 极度负面'],
+    datasets: [{
+      label: '公告数量',
+      data: [104, 4219, 2859, 1477, 100],
+      backgroundColor: ['#00B050', '#92D050', '#d1d5db', '#f87171', '#dc2626'],
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.raw.toLocaleString()}条 (${(ctx.raw/8759*100).toFixed(1)}%)`
+        }
+      }
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+</body>
+</html>
